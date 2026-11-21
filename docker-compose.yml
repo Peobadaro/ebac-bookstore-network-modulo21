@@ -12,6 +12,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    networks:
+      - bookstore_network
 
   web:
     build: .
@@ -25,6 +27,15 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    networks:
+      - bookstore_network
 
 volumes:
   postgres_data:
+
+# Rede declarada de forma explícita. O tipo é bridge (o padrão do Docker),
+# e os serviços web e db se enxergam pelo nome (ex.: SQL_HOST=db).
+networks:
+  bookstore_network:
+    name: bookstore_network
+    driver: bridge
