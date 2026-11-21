@@ -1,0 +1,46 @@
+name: Docker Compose (Django + Postgres)
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  compose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixa o código
+        uses: actions/checkout@v4
+
+      - name: docker compose up (web + db)
+        run: docker compose up -d --build
+
+      - name: Espera a API subir
+        run: |
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:8000/bookstore/v1/product/ > /dev/null && break
+            sleep 2
+          done
+          docker compose ps
+
+      - name: Confere que o Django está usando o Postgres
+        run: |
+          docker compose exec -T web python manage.py shell -c "from django.db import connection; print('Banco em uso:', connection.vendor, '-', connection.settings_dict['HOST'], '-', connection.settings_dict['NAME'])"
+          docker compose exec -T db psql -U bookstore_dev -d bookstore_dev_db -c "\dt"
+
+      - name: Roda os testes no container (com Postgres)
+        run: docker compose exec -T web python manage.py test
+
+      - name: Testa a API
+        run: |
+          echo "GET /bookstore/v1/product/ -> $(curl -s -o /dev/null -w '%{http_code}' http://localhost:8000/bookstore/v1/product/)"
+          echo "GET /bookstore/v1/order/   -> $(curl -s -o /dev/null -w '%{http_code}' http://localhost:8000/bookstore/v1/order/)"
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8000/bookstore/v1/product/)" = "200"
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8000/bookstore/v1/order/)" = "401"
+
+      - name: Logs
+        if: always()
+        run: docker compose logs
+
+      - name: docker compose down
+        if: always()
+        run: docker compose down -v
