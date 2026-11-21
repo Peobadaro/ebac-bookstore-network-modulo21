@@ -1,4 +1,4 @@
-name: Docker Compose (Django + Postgres)
+name: Docker Compose (Django + Postgres + network bridge)
 
 on:
   push:
@@ -26,6 +26,16 @@ jobs:
         run: |
           docker compose exec -T web python manage.py shell -c "from django.db import connection; print('Banco em uso:', connection.vendor, '-', connection.settings_dict['HOST'], '-', connection.settings_dict['NAME'])"
           docker compose exec -T db psql -U bookstore_dev -d bookstore_dev_db -c "\dt"
+
+      - name: Confere a network bridge
+        run: |
+          docker network ls --filter name=bookstore_network
+          echo "Driver: $(docker network inspect bookstore_network --format '{{.Driver}}')"
+          echo "Containers na rede:"
+          docker network inspect bookstore_network --format '{{range .Containers}}{{.Name}} -> {{.IPv4Address}}{{println}}{{end}}'
+          test "$(docker network inspect bookstore_network --format '{{.Driver}}')" = "bridge"
+          test "$(docker network inspect bookstore_network --format '{{len .Containers}}')" = "2"
+          docker compose exec -T web python -c "import socket; print('web resolve db ->', socket.gethostbyname('db'))"
 
       - name: Roda os testes no container (com Postgres)
         run: docker compose exec -T web python manage.py test

@@ -120,3 +120,29 @@ docker compose down                               # derruba (use -v para apagar 
 ```
 
 API: http://localhost:8000/bookstore/v1/product/
+
+## Docker Network
+
+Os serviços `web` e `db` usam a rede **`bookstore_network`**, declarada de forma explícita no final do `docker-compose.yml` com `driver: bridge`:
+
+```yaml
+services:
+  db:
+    networks:
+      - bookstore_network
+  web:
+    networks:
+      - bookstore_network
+
+networks:
+  bookstore_network:
+    name: bookstore_network
+    driver: bridge
+```
+
+Na mesma rede bridge, um container encontra o outro pelo nome do serviço. É por isso que o Django se conecta ao banco com `SQL_HOST=db`.
+
+```bash
+docker network ls
+docker network inspect bookstore_network
+```
